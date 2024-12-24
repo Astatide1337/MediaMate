@@ -6,6 +6,7 @@ import os
 from Video import TemplateVideo, PictureVideo
 from Scraper import ScrapeImages
 from Quote import GetQuote
+from General import DownloadVoice, GenerateTTS
 import requests
 import sv_ttk
 import re
@@ -54,11 +55,51 @@ class MediaMate:
         self.notebook.add(self.config_frame, text="Config")
         self.create_config_tab()
 
+        # Download voice tab
+        self.create_download_voice_tab()
+
+        # Generate TTS tab
+        self.create_tts_tab()
+
+        # Image Scraping Tab
+        image_scraping_frame = ttk.Frame(self.notebook)
+        self.notebook.add(image_scraping_frame, text="Image Scraping")
+
+        # URL Input Section
+        url_label = ttk.Label(image_scraping_frame, text="URL:")
+        url_label.grid(row=0, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        url_entry = ttk.Entry(image_scraping_frame, width=self.ENTRY_WIDTH)
+        url_entry.grid(row=0, column=1, padx=self.PADDING, pady=self.PADDING)
+
+        # Folder Input Section
+        folder_label = ttk.Label(image_scraping_frame, text="Folder:")
+        folder_label.grid(row=1, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        folder_entry = ttk.Entry(image_scraping_frame, width=self.ENTRY_WIDTH)
+        folder_entry.grid(row=1, column=1, padx=self.PADDING, pady=self.PADDING)
+
+        # Scroll Times Input Section
+        scroll_times_label = ttk.Label(image_scraping_frame, text="Scroll Times:")
+        scroll_times_label.grid(row=2, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        scroll_times_entry = ttk.Entry(image_scraping_frame, width=self.ENTRY_WIDTH)
+        scroll_times_entry.grid(row=2, column=1, padx=self.PADDING, pady=self.PADDING)
+
+
+        
+        
         # Ensure default font is available
         try:
             self.ensure_default_font()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to ensure default font: {e}")
+
+
+
+
+
+        
 
     
 
@@ -294,10 +335,6 @@ class MediaMate:
         scroll_times = self.scroll_times_entry.get()
         logging.info("Starting image scraping process.")
 
-        if not self.validate_url(url):
-            messagebox.showerror("Error", "Invalid URL format.")
-            return
-
         if not os.path.isdir(folder) or not os.access(folder, os.W_OK):
             messagebox.showerror("Error", "Invalid or unwritable folder path.")
             return
@@ -319,6 +356,105 @@ class MediaMate:
         except Exception as e:
             self.handle_error("scrape images", e)
             logging.error(f"Image scraping process failed: {e}")
+
+
+    def create_download_voice_tab(self):
+        download_voice_tab = ttk.Frame(self.notebook)
+        self.notebook.add(download_voice_tab, text="Download Voice")
+
+        url_label = ttk.Label(download_voice_tab, text="URL:")
+        url_label.grid(row=0, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        self.url_entry = ttk.Entry(download_voice_tab, width=self.ENTRY_WIDTH, validate="key", validatecommand=self.check_input_fields)
+        self.url_entry.grid(row=0, column=1, padx=self.PADDING, pady=self.PADDING)
+
+        name_label = ttk.Label(download_voice_tab, text="Name:")
+        name_label.grid(row=1, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        self.name_entry = ttk.Entry(download_voice_tab, width=self.ENTRY_WIDTH, validate="key", validatecommand=self.check_input_fields)
+        self.name_entry.grid(row=1, column=1, padx=self.PADDING, pady=self.PADDING)
+
+        self.download_button = ttk.Button(download_voice_tab, text="Download Voice", command=self.download_voice)
+        self.download_button.config(state="disabled")
+        self.download_button.grid(row=2, column=0, columnspan=2, padx=self.PADDING, pady=self.PADDING)
+
+    def check_input_fields(self):
+        url = self.url_entry.get()
+        name = self.name_entry.get()
+
+
+        # Check if voice already exists
+        voice_dir = "./Voices"
+        if os.path.exists(os.path.join(voice_dir, f"{name.replace(' ', '')}.wav")):
+            messagebox.showwarning("Voice already exists", "A voice with this name already exists.")
+            return False
+
+        # Check if both fields are filled out
+        if url and name:
+            self.download_button.config(state="normal")
+        else:
+            self.download_button.config(state="disabled")
+        return True
+
+    def download_voice(self):
+        url = self.url_entry.get()
+        name = self.name_entry.get()
+
+        if not url or not name:
+            messagebox.showerror("Error", "Please provide a valid URL and name for the voice.")
+            return
+        youtube_url_pattern = r"^https?:\/\/(?:www\.)?youtube\.com\/.*$"
+        if not re.match(youtube_url_pattern, url):
+            messagebox.showwarning("Invalid URL", "Please enter a valid YouTube URL.")
+            return False
+
+        try:
+            DownloadVoice(url, name)
+            messagebox.showinfo("Success", "Voice downloaded successfully.")
+        except Exception as e:
+            self.handle_error("download voice", e)
+
+
+    def create_tts_tab(self):
+        tts_tab = ttk.Frame(self.notebook)
+        self.notebook.add(tts_tab, text="TTS")
+
+        text_label = ttk.Label(tts_tab, text="Text:")
+        text_label.grid(row=0, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        self.text_entry = ttk.Entry(tts_tab, width=self.ENTRY_WIDTH)
+        self.text_entry.grid(row=0, column=1, padx=self.PADDING, pady=self.PADDING)
+
+        speaker_label = ttk.Label(tts_tab, text="Speaker WAV file:")
+        speaker_label.grid(row=1, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        self.speaker_entry = ttk.Entry(tts_tab, width=self.ENTRY_WIDTH)
+        self.speaker_entry.grid(row=1, column=1, padx=self.PADDING, pady=self.PADDING)
+
+        browse_button = ttk.Button(tts_tab, text="Browse", command=self.browse_speaker_file)
+        browse_button.grid(row=1, column=2, padx=self.PADDING, pady=self.PADDING)
+
+        filename_label = ttk.Label(tts_tab, text="Filename:")
+        filename_label.grid(row=2, column=0, padx=self.PADDING, pady=self.PADDING)
+
+        self.filename_entry = ttk.Entry(tts_tab, width=self.ENTRY_WIDTH)
+        self.filename_entry.grid(row=2, column=1, padx=self.PADDING, pady=self.PADDING)
+
+        generate_button = ttk.Button(tts_tab, text="Generate TTS", command=self.generate_tts)
+        generate_button.grid(row=3, column=0, columnspan=2, padx=self.PADDING, pady=self.PADDING)
+
+    def browse_speaker_file(self):
+        filename = filedialog.askopenfilename(title="Select Speaker WAV file", filetypes=[("WAV files", "*.wav")])
+        if filename:
+            self.speaker_entry.delete(0, tk.END)
+            self.speaker_entry.insert(0, filename)
+
+    def generate_tts(self):
+        text = self.text_entry.get()
+        speaker_file = self.speaker_entry.get()
+        filename = self.filename_entry.get()
+        GenerateTTS(text, speaker_file, filename)
+        messagebox.showinfo("Success", "TTS generated successfully.")
 
 # Example usage
 if __name__ == "__main__":
